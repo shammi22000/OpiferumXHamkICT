@@ -14,6 +14,61 @@ include "Class/Member.php";
  * Keep all JSON → Object mapping in THIS file for today’s task (no separate loader).
  */
 
+
+/******Read bands_full.json → build objects (Link, Member, Song, Album, Band) → print with getters.*********************************************** */
+$bands = [];
+
+foreach ($data['bands'] as $bandData) {
+    // Links
+    $links = null;
+    if (isset($bandData['links']) && is_array($bandData['links'])) {
+        $links = new Link(
+            $bandData['links']['website'] ?? null,
+            $bandData['links']['wikipedia'] ?? null,
+            $bandData['links']['spotify'] ?? null,
+            $bandData['links']['youtube'] ?? null
+        );
+    }
+
+    // Members
+    $members = [];
+    foreach ($bandData['members'] ?? [] as $m) {
+        $members[] = new Member(
+            $m['name'] ?? 'Unknown',
+            $m['role'] ?? 'Unknown',
+            (int)($m['joined'] ?? 0)
+        );
+    }
+
+    // Albums + Songs
+    $albums = [];
+    foreach ($bandData['albums'] ?? [] as $a) {
+        $songs = [];
+        foreach ($a['songs'] ?? [] as $s) {
+            $songs[] = new Song($s['title'] ?? 'Untitled', $s['length'] ?? '0:00');
+        }
+
+        $albums[] = new Album(
+            $a['title'] ?? 'Unknown Album',
+            (int)($a['release_year'] ?? 0),
+            $a['genre'] ?? 'Unknown',
+            $songs
+        );
+    }
+
+    // Band
+    $bands[] = new Band(
+        $bandData['name'] ?? 'Unknown Band',
+        (int)($bandData['founded'] ?? 0),
+        $bandData['origin'] ?? 'Unknown',
+        $bandData['genres'] ?? [],
+        $members,
+        $albums,
+        $links
+    );
+}
+
+/***************************************************** */
 /**
  * EXAMPLES OF OBJECTS
  */
