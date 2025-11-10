@@ -14,6 +14,61 @@ include "Class/Member.php";
  * Keep all JSON → Object mapping in THIS file for today’s task (no separate loader).
  */
 
+
+/****** build objects (Link, Member, Song, Album, Band) *********************************************** */
+$bands = [];
+
+foreach ($data['bands'] as $bandData) {
+    // Links
+    $links = null;
+    if (isset($bandData['links']) && is_array($bandData['links'])) {
+        $links = new Link(
+            $bandData['links']['website'] ?? null,
+            $bandData['links']['wikipedia'] ?? null,
+            $bandData['links']['spotify'] ?? null,
+            $bandData['links']['youtube'] ?? null
+        );
+    }
+
+    // Members
+    $members = [];
+    foreach ($bandData['members'] ?? [] as $m) {
+        $members[] = new Member(
+            $m['name'] ?? 'Unknown',
+            $m['role'] ?? 'Unknown',
+            (int)($m['joined'] ?? 0)
+        );
+    }
+
+    // Albums + Songs
+    $albums = [];
+    foreach ($bandData['albums'] ?? [] as $a) {
+        $songs = [];
+        foreach ($a['songs'] ?? [] as $s) {
+            $songs[] = new Song($s['title'] ?? 'Untitled', $s['length'] ?? '0:00');
+        }
+
+        $albums[] = new Album(
+            $a['title'] ?? 'Unknown Album',
+            (int)($a['release_year'] ?? 0),
+            $a['genre'] ?? 'Unknown',
+            $songs
+        );
+    }
+
+    // Band
+    $bands[] = new Band(
+        $bandData['name'] ?? 'Unknown Band',
+        (int)($bandData['founded'] ?? 0),
+        $bandData['origin'] ?? 'Unknown',
+        $bandData['genres'] ?? [],
+        $members,
+        $albums,
+        $links
+    );
+}
+
+/***************************************************** */
 /**
  * EXAMPLES OF OBJECTS
  */
@@ -90,6 +145,7 @@ echo PHP_EOL . "Official website: " . $band->getLinks()?->getWebsite() . PHP_EOL
 // TODO 1: READ & DECODE THE JSON FILE
 // ---------------------------------------------------------
 /**
+ 
  * GOAL:
  * - Read `bands_full.json` from the project root.
  * - Decode it to an associative array.
@@ -112,6 +168,24 @@ echo PHP_EOL . "Official website: " . $band->getLinks()?->getWebsite() . PHP_EOL
 // $json     = ...
 // $data     = ...
 // Validate structure here...
+$jsonPath = __DIR__ . '/bands_full.json';
+if (!file_exists($jsonPath)) {
+    die("Error: JSON file not found at $jsonPath");
+}
+
+$json = file_get_contents($jsonPath);
+if ($json === false) {
+    die("Error: Could not read the JSON file.");
+}
+
+$data = json_decode($json, true);
+if (json_last_error() !== JSON_ERROR_NONE) {
+    die("Error: Invalid JSON format — " . json_last_error_msg());
+}
+
+if (!isset($data['bands']) || !is_array($data['bands'])) {
+    die("Error: JSON must contain a 'bands' array.");
+}
 
 
 // ---------------------------------------------------------
@@ -162,6 +236,69 @@ $bands = [];
 //     //    - Create Band object with name, founded, origin, genres, $members, $albums, $links.
 //     //    - Append to $bands.
 // }
+
+$bands = [];
+
+foreach ($data['bands'] as $bandData) {
+
+    // 2.1 Links (nullable)
+    $links = null;
+    if (isset($bandData['links']) && is_array($bandData['links'])) {
+        $links = new Link(
+            website: $bandData['links']['website'] ?? null,
+            wikipedia: $bandData['links']['wikipedia'] ?? null,
+            spotify: $bandData['links']['spotify'] ?? null,
+            youtube: $bandData['links']['youtube'] ?? null
+        );
+    }
+
+    // 2.2 Members
+    $members = [];
+    if (isset($bandData['members']) && is_array($bandData['members'])) {
+        foreach ($bandData['members'] as $mem) {
+            $members[] = new Member(
+                $mem['name'] ?? 'Unknown',
+                $mem['role'] ?? 'Unknown',
+                (int)($mem['joined'] ?? 0)
+            );
+        }
+    }
+
+    // 2.3 Albums + Songs
+    $albums = [];
+    if (isset($bandData['albums']) && is_array($bandData['albums'])) {
+        foreach ($bandData['albums'] as $alb) {
+            $songs = [];
+            if (isset($alb['songs']) && is_array($alb['songs'])) {
+                foreach ($alb['songs'] as $s) {
+                    $songs[] = new Song(
+                        $s['title'] ?? 'Untitled',
+                        $s['length'] ?? '00:00'
+                    );
+                }
+            }
+
+            $albums[] = new Album(
+                title: $alb['title'] ?? 'Unknown Album',
+                releaseYear: (int)($alb['release_year'] ?? 0),
+                genre: $alb['genre'] ?? 'Unknown',
+                songs: $songs
+            );
+        }
+    }
+
+    // 2.4 Band
+    $bands[] = new Band(
+        name: $bandData['name'] ?? 'Unnamed Band',
+        founded: (int)($bandData['founded'] ?? 0),
+        origin: $bandData['origin'] ?? 'Unknown',
+        genres: $bandData['genres'] ?? [],
+        members: $members,
+        albums: $albums,
+        links: $links
+    );
+}
+
 
 
 // ---------------------------------------------------------
@@ -236,6 +373,94 @@ $bands = [];
 //   // Links (conditionals for each)
 //   echo "</section>";
 // }
+
+foreach ($bands as $band): ?>
+    <section class="band">
+        <h2><?= htmlspecialchars($band->getName()) ?></h2>
+        <div class="meta">
+            Founded: <?= htmlspecialchars((string)$band->getFounded()) ?> —
+            Origin: <?= htmlspecialchars($band->getOrigin()) ?><br>
+            Genres: <?= htmlspecialchars(implode(', ', $band->getGenres())) ?>
+        </div>
+
+        <h3>Members</h3>
+        <ul>
+            <?php foreach ($band->getMembers() as $m): ?>
+                <li><?= htmlspecialchars($m->getName()) ?> — <?= htmlspecialchars($m->getRole()) ?> (joined <?= htmlspecialchars((string)$m->getJoined()) ?>)</li>
+            <?php endforeach; ?>
+        </ul>
+
+        <h3>Albums</h3>
+        <?php foreach ($band->getAlbums() as $a): ?>
+            <strong><?= htmlspecialchars($a->getTitle()) ?></strong>
+            (<?= htmlspecialchars((string)$a->getReleaseYear()) ?>) — <?= htmlspecialchars($a->getGenre()) ?><br>
+            <ul>
+                <?php foreach ($a->getSongs() as $s): ?>
+                    <li><?= htmlspecialchars($s->getTitle()) ?> (<?= htmlspecialchars($s->getLength()) ?>)</li>
+                <?php endforeach; ?>
+            </ul>
+        <?php endforeach; ?>
+
+        <?php if ($band->getLinks()): ?>
+            <h3>Links</h3>
+            <ul>
+                <?php if ($band->getLinks()->getWebsite()): ?>
+                    <li><a href="<?= htmlspecialchars($band->getLinks()->getWebsite()) ?>" target="_blank">Website</a></li>
+                <?php endif; ?>
+                <?php if ($band->getLinks()->getWikipedia()): ?>
+                    <li><a href="<?= htmlspecialchars($band->getLinks()->getWikipedia()) ?>" target="_blank">Wikipedia</a></li>
+                <?php endif; ?>
+                <?php if ($band->getLinks()->getSpotify()): ?>
+                    <li><a href="<?= htmlspecialchars($band->getLinks()->getSpotify()) ?>" target="_blank">Spotify</a></li>
+                <?php endif; ?>
+                <?php if ($band->getLinks()->getYoutube()): ?>
+                    <li><a href="<?= htmlspecialchars($band->getLinks()->getYoutube()) ?>" target="_blank">YouTube</a></li>
+                <?php endif; ?>
+            </ul>
+        <?php endif; ?>
+    </section>
+<?php endforeach; ?>
+
+
+<?php
+foreach ($bands as $band) {
+    echo "<section class='band'>";
+    echo "<h2>" . htmlspecialchars($band->getName()) . "</h2>";
+    echo "<div class='meta'>Founded: " . htmlspecialchars((string)$band->getFounded()) . " | Origin: " . htmlspecialchars($band->getOrigin()) . "</div>";
+    echo "<div class='meta'>Genres: " . htmlspecialchars(implode(", ", $band->getGenres())) . "</div>";
+
+    // Members
+    echo "<h3>Members:</h3><ul>";
+    foreach ($band->getMembers() as $member) {
+        echo "<li>" . htmlspecialchars($member->getName()) . " — " . htmlspecialchars($member->getRole()) . " (Joined " . htmlspecialchars((string)$member->getJoined()) . ")</li>";
+    }
+    echo "</ul>";
+
+    // Albums and Songs
+    echo "<h3>Albums:</h3>";
+    foreach ($band->getAlbums() as $album) {
+        echo "<h4>" . htmlspecialchars($album->getTitle()) . " (" . htmlspecialchars((string)$album->getReleaseYear()) . ") — " . htmlspecialchars($album->getGenre()) . "</h4><ul>";
+        foreach ($album->getSongs() as $song) {
+            echo "<li>" . htmlspecialchars($song->getTitle()) . " (" . htmlspecialchars($song->getLength()) . ")</li>";
+        }
+        echo "</ul>";
+    }
+
+    // Links
+    $links = $band->getLinks();
+    if ($links !== null) {
+        echo "<h3>Links:</h3><ul>";
+        if ($links->getWebsite() !== null) {
+            echo "<li><a href='" . htmlspecialchars($links->getWebsite()) . "' target='_blank'>Website</a></li>";
+        }
+        if ($links->getWikipedia() !== null) {
+            echo "<li><a href='" . htmlspecialchars($links->getWikipedia()) . "' target='_blank'>Wikipedia</a></li>";
+        }
+        if ($links->getSpotify() !== null) {
+            echo "<li><a href='" . htmlspecialchars($links->getSpotify()) . "' target='_blank'>Spotify</a></li>";
+        }
+        if ($links->getYouTube() !== null) {
+            echo "<li><a href='" . htmlspecialchars($links->getYou
 ?>
 
 </body>
